@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Entry Status Tracker</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f7fb;
+      color: #222;
+    }
+
+    header {
+      background: #0f3d5e;
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 26px;
+    }
+
+    header p {
+      margin: 6px 0 0;
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .container {
+      padding: 18px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      border-left: 6px solid #1d70b8;
+    }
+
+    .card h3 {
+      margin: 0;
+      font-size: 14px;
+      color: #555;
+    }
+
+    .card .number {
+      margin-top: 8px;
+      font-size: 30px;
+      font-weight: bold;
+      color: #0f3d5e;
+    }
+
+    .green { border-left-color: #15803d; }
+    .orange { border-left-color: #f59e0b; }
+    .red { border-left-color: #dc2626; }
+    .purple { border-left-color: #7c3aed; }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      overflow-x: auto;
+    }
+
+    .section h2 {
+      margin-top: 0;
+      color: #0f3d5e;
+      font-size: 20px;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 900px;
+    }
+
+    th {
+      background: #0f3d5e;
+      color: white;
+      padding: 9px;
+      text-align: left;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    td {
+      padding: 8px;
+      border-bottom: 1px solid #ddd;
+      vertical-align: top;
+    }
+
+    tr:hover {
+      background: #f1f5f9;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 14px;
+      font-size: 12px;
+      font-weight: bold;
+      background: #e5e7eb;
+      white-space: nowrap;
+    }
+
+    .completed {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .blank {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    a {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      font-size: 18px;
+      color: #555;
+    }
+
+    .error {
+      background: #fee2e2;
+      color: #991b1b;
+      padding: 15px;
+      border-radius: 8px;
+      font-weight: bold;
+    }
+
+    .refresh {
+      text-align: right;
+      margin-bottom: 12px;
+    }
+
+    button {
+      background: #0f3d5e;
+      color: white;
+      border: none;
+      padding: 9px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #14527d;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Entry Status Tracker</h1>
+  <p>Single-screen dashboard for seven Google Docs</p>
+</header>
+
+<div class="container">
+  <div class="refresh">
+    <button onclick="location.reload()">Refresh Dashboard</button>
+  </div>
+
+  <div id="dashboard" class="loading">Loading dashboard...</div>
+</div>
+
+<script>
+  const API_URL = "https://script.google.com/macros/s/AKfycbxyFq2263ajO2PEV4izEpTWVjD7UjfJguNs2lA2IggAegOkYLoWpnq2zAG9iLEzPqKB/exec";
+
+  function loadData() {
+    const callbackName = "handleDashboardData";
+
+    const script = document.createElement("script");
+    script.src = API_URL + "?callback=" + callbackName + "&t=" + new Date().getTime();
+
+    script.onerror = function() {
+      document.getElementById("dashboard").innerHTML =
+        '<div class="error">Unable to load data. Please check Apps Script deployment and access settings.</div>';
+    };
+
+    document.body.appendChild(script);
+  }
+
+  function handleDashboardData(data) {
+    renderDashboard(data);
+  }
+
+  function renderDashboard(data) {
+    let totalDocs = data.length;
+    let totalTables = 0;
+    let totalEntries = 0;
+    let totalCompleted = 0;
+    let totalPending = 0;
+    let totalBlank = 0;
+
+    let allTables = [];
+    let allEntries = [];
+
+    data.forEach(doc => {
+      totalTables += doc.totalTables || 0;
+      totalEntries += doc.totalEntries || 0;
+      totalCompleted += doc.completed || 0;
+      totalPending += doc.pending || 0;
+      totalBlank += doc.blank || 0;
+
+      if (doc.tables) allTables = allTables.concat(doc.tables);
+      if (doc.entries) allEntries = allEntries.concat(doc.entries);
+    });
+
+    const overallCompletion = totalEntries > 0
+      ? Math.round((totalCompleted / totalEntries) * 100)
+      : 0;
+
+    let docRows = "";
+
+    data.forEach((doc, index) => {
+      docRows += `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${doc.documentName || ""}</td>
+          <td>${doc.totalTables || 0}</td>
+          <td>${doc.totalEntries || 0}</td>
+          <td>${doc.completed || 0}</td>
+          <td>${doc.pending || 0}</td>
+          <td>${doc.blank || 0}</td>
+          <td>${doc.completionPercent || 0}%</td>
+          <td>${doc.error ? doc.error : ""}</td>
+          <td><a href="${doc.documentUrl}" target="_blank">Open</a></td>
+        </tr>
+      `;
+    });
+
+    let tableRows = "";
+
+    allTables.forEach((table, index) => {
+      tableRows += `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${table.documentName || ""}</td>
+          <td>${table.tableName || ""}</td>
+          <td>${table.totalEntries || 0}</td>
+          <td>${table.completed || 0}</td>
+          <td>${table.pending || 0}</td>
+          <td>${table.blank || 0}</td>
+          <td>${table.completionPercent || 0}%</td>
+        </tr>
+      `;
+    });
+
+    let entryRows = "";
+
+    allEntries.forEach(entry => {
+      const badgeClass = getBadgeClass(entry.status);
+
+      entryRows += `
+        <tr>
+          <td>${entry.documentName || ""}</td>
+          <td>${entry.tableName || ""}</td>
+          <td>${entry.entryNo || ""}</td>
+          <td><span class="badge ${badgeClass}">${entry.status || ""}</span></td>
+          <td>${entry.details || ""}</td>
+        </tr>
+      `;
+    });
+
+    document.getElementById("dashboard").className = "";
+    document.getElementById("dashboard").innerHTML = `
+      <div class="cards">
+        <div class="card">
+          <h3>Total Documents</h3>
+          <div class="number">${totalDocs}</div>
+        </div>
+
+        <div class="card purple">
+          <h3>Total Tables</h3>
+          <div class="number">${totalTables}</div>
+        </div>
+
+        <div class="card">
+          <h3>Total Entries</h3>
+          <div class="number">${totalEntries}</div>
+        </div>
+
+        <div class="card green">
+          <h3>Completed / Received</h3>
+          <div class="number">${totalCompleted}</div>
+        </div>
+
+        <div class="card orange">
+          <h3>Pending</h3>
+          <div class="number">${totalPending}</div>
+        </div>
+
+        <div class="card red">
+          <h3>Blank / Not Updated</h3>
+          <div class="number">${totalBlank}</div>
+        </div>
+
+        <div class="card">
+          <h3>Overall Completion</h3>
+          <div class="number">${overallCompletion}%</div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>Document-wise Status</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Sl. No.</th>
+              <th>Document / Area</th>
+              <th>Tables</th>
+              <th>Entries</th>
+              <th>Completed</th>
+              <th>Pending</th>
+              <th>Blank</th>
+              <th>Completion</th>
+              <th>Error, if any</th>
+              <th>Link</th>
+            </tr>
+          </thead>
+          <tbody>${docRows}</tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>Table-wise Entry Status</h2>
+        <input type="text" id="tableSearch" onkeyup="filterTable('tableSearch', 'tableStatusTable')" placeholder="Search table name or document name...">
+
+        <table id="tableStatusTable">
+          <thead>
+            <tr>
+              <th>Sl. No.</th>
+              <th>Document / Area</th>
+              <th>Table Name</th>
+              <th>Total Entries</th>
+              <th>Completed</th>
+              <th>Pending</th>
+              <th>Blank</th>
+              <th>Completion</th>
+            </tr>
+          </thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+
+      <div class="section">
+        <h2>Entry-wise Details</h2>
+        <input type="text" id="entrySearch" onkeyup="filterTable('entrySearch', 'entryDetailsTable')" placeholder="Search entries, status, document, table name or text...">
+
+        <table id="entryDetailsTable">
+          <thead>
+            <tr>
+              <th>Document / Area</th>
+              <th>Table Name</th>
+              <th>Entry No.</th>
+              <th>Status</th>
+              <th>Entry Details</th>
+            </tr>
+          </thead>
+          <tbody>${entryRows}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function getBadgeClass(status) {
+    const s = String(status).toLowerCase();
+
+    if (
+      s.includes("complete") ||
+      s.includes("received") ||
+      s.includes("submitted") ||
+      s.includes("done") ||
+      s.includes("yes")
+    ) {
+      return "completed";
+    }
+
+    if (
+      s.includes("blank") ||
+      s.includes("not updated") ||
+      s.trim() === ""
+    ) {
+      return "blank";
+    }
+
+    return "pending";
+  }
+
+  function filterTable(inputId, tableId) {
+    const input = document.getElementById(inputId);
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById(tableId);
+    const rows = table.getElementsByTagName("tr");
+
+    for (let i = 1; i < rows.length; i++) {
+      const text = rows[i].innerText.toLowerCase();
+      rows[i].style.display = text.includes(filter) ? "" : "none";
+    }
+  }
+
+  loadData();
+</script>
+
+</body>
+</html>
